@@ -772,7 +772,7 @@ config TOUCHSCREEN_EDT_FT5X06
 	  module will be called edt-ft5x06.
 
 config TOUCHSCREEN_TLSC6X
-	bool "Focaltech Touchscreen"
+	bool "Chipsemi Touchscreen"
 		depends on I2C
 		default n
 		help
