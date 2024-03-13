@@ -766,3 +766,17 @@
 		/* sdio_cmd */
 		<1 RK_PB3 1 &pcfg_pull_none_drv_level_0>;
 };
+
+&wireless_wlan {
+	pinctrl-0 = <&wifi_wake_host &wifi_poweren_gpio>;
+	WIFI,poweren_gpio = <&gpio2 RK_PB1 GPIO_ACTIVE_HIGH>;
+};
+
+&pinctrl {
+	wireless-wlan {
+		/omit-if-no-ref/
+		wifi_poweren_gpio: wifi-poweren-gpio {
+			rockchip,pins = <2 RK_PB1 0 &pcfg_pull_none>;
+		};
+	};
+};

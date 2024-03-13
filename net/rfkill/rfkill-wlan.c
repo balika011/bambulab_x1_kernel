@@ -266,12 +266,12 @@ int rockchip_wifi_power(int on)
 
 		if (on) {
 			if (gpio_is_valid(poweron->io)) {
-				gpio_set_value(poweron->io, poweron->enable);
+				gpio_direction_output(poweron->io, poweron->enable);
 				msleep(100);
 			}
 
 			if (gpio_is_valid(reset->io)) {
-				gpio_set_value(reset->io, reset->enable);
+				gpio_direction_output(reset->io, reset->enable);
 				msleep(100);
 			}
 
@@ -280,12 +280,12 @@ int rockchip_wifi_power(int on)
 		} else {
 			if (gpio_is_valid(poweron->io)) {
 				printk("wifi power off\n");
-				gpio_set_value(poweron->io, !(poweron->enable));
+				gpio_direction_output(poweron->io, !(poweron->enable));
 				msleep(100);
 			}
 
 			if (gpio_is_valid(reset->io)) {
-				gpio_set_value(reset->io, !(reset->enable));
+				gpio_direction_output(reset->io, !(reset->enable));
 			}
 
 			wifi_power_state = 0;
@@ -786,14 +786,8 @@ static int rfkill_wlan_probe(struct platform_device *pdev)
 	if (gpio_is_valid(pdata->vbat_n.io))
 		gpio_direction_output(pdata->vbat_n.io, pdata->vbat_n.enable);
 
-#ifdef CONFIG_SDIO_KEEPALIVE
-	if (gpio_is_valid(pdata->power_n.io) &&
-	    primary_sdio_host && primary_sdio_host->support_chip_alive)
-		gpio_direction_output(pdata->power_n.io, pdata->power_n.enable);
-#else
 	if (gpio_is_valid(pdata->power_n.io))
-		gpio_direction_output(pdata->power_n.io, !pdata->power_n.enable);
-#endif
+		gpio_direction_output(pdata->power_n.io, pdata->power_n.enable);
 
 
 	if (pdata->wifi_power_remain)
