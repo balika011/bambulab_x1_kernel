@@ -26,9 +26,27 @@ DTBS['RK3308-EVB'] = OrderedDict([('rk3308-evb-dmic-i2s-v10', '#_saradc_ch3=288'
 				  ('rk3308-evb-dmic-pdm-v10', '#_saradc_ch3=1024'),
 				  ('rk3308-evb-amic-v10', '#_saradc_ch3=407')])
 
+DTBS['rv1126-bl-p001-v5.dtb'] = OrderedDict([
+                                #('rv1126-bl-p001-v2', '#_saradc_ch1=512'), # 0.9v
+				#('rv1126-bl-p001-v3', '#_saradc_ch1=543'), # 0.954v
+				#('rv1126-bl-p001-v4_a', '#_saradc_ch1=626#_saradc_ch2=333'), # 1.1v
+				#('rv1126-bl-p001-v4_b', '#_saradc_ch1=626#_saradc_ch2=0'), # 1.1v
+				# ('rv1126-bl-p001-v5_a', '#_saradc_ch1=683#_saradc_ch2=333'), # 1.2v_0.6v
+				# ('rv1126-bl-p001-v5_b', '#_saradc_ch1=683#_saradc_ch2=0'), # 1.2v_0.0v
+				# ('rv1126-bl-p001-v5_c', '#_saradc_ch1=683#_saradc_ch2=505')]) # 1.2v
+				('rv1126-bl-p001-v5', '#_saradc_ch1=683'),])# 1.2v
+
+
+DTBS['rv1126-n2-v1.dtb'] = OrderedDict([
+				('rv1126-n2-v1', '#_saradc_ch1=0'),])# 0v
+
+DTBS['rv1126-c13-v2.dtb'] = OrderedDict([
+                                ('rv1126-c13-v1', '#_saradc_ch1=427'),# 0.75v
+				('rv1126-c13-v2', '#_saradc_ch1=512')])# 0.9v
+
 def main():
     if (len(sys.argv) < 2) or (sys.argv[1] == '-h'):
-        print __doc__
+        print(__doc__)
         sys.exit(2)
 
     BOARD = sys.argv[1]
@@ -47,7 +65,7 @@ def main():
         shutil.copyfile(ori_file, new_file)
         target_dtb_list += ' ' + new_file
 
-    print target_dtb_list
+    print(target_dtb_list)
     os.system('scripts/resource_tool logo.bmp logo_kernel.bmp ' + target_dtb_list)
     os.system('rm ' + target_dtb_list)
 

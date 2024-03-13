@@ -1,0 +1,11 @@
+#
+# Bblab SoC Drivers
+#
+menu "Bblab SoC Drivers"
+
+config BBLAB_TIME_SYNC
+	bool "Bblab time sync driver"
+	help
+	  This driver is used for time sync between socs.
+
+endmenu

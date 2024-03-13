@@ -40,6 +40,7 @@
 #include <video/videomode.h>
 
 #include "../rockchip/rockchip_drm_drv.h"
+#define MIPI_LCD_ESD_ERR_REBOOT 1
 
 struct panel_cmd_header {
 	u8 data_type;
@@ -146,6 +147,74 @@ enum rockchip_spi_cmd_type {
 	SPI_3LINE_9BIT_MODE_DATA,
 	SPI_4LINE_8BIT_MODE,
 };
+
+#if MIPI_LCD_ESD_ERR_REBOOT
+static struct delayed_work	esd_check_dw;
+static struct work_struct reset_work;
+static u32 mipi_err_cnt = 0;
+static u32 esd_power_value = 0, esd_power_cmd = 0;
+
+struct panel_simple *gPanel;
+
+static bool esd_check_value_read(u32 cmd, u8* value)
+{
+	ssize_t err;
+	bool ret = false;
+
+	/*u8 addr = MIPI_LCD_ESD_ERR_REBOOT;*/
+	gPanel->dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
+
+	err = mipi_dsi_dcs_read(gPanel->dsi, cmd, value, 1);
+
+	gPanel->dsi->mode_flags |= MIPI_DSI_MODE_LPM;
+
+	if (err < 0) {
+		mipi_err_cnt++;
+		/*pr_err("failed to read from 0x%x: %zd --- rk-dcs\n",addr, err);*/
+		ret = false;
+	} else {
+		mipi_err_cnt = 0;
+		/*pr_err("succ to read from 0x%x: 0x%x --- rk-dcs\n",addr, value);*/
+		ret = true;
+	}
+
+	return ret;
+}
+
+static void esd_mipi_reset(struct work_struct *work)
+{
+	struct drm_connector *connector = gPanel->base.connector;
+	struct drm_encoder *encoder = connector->encoder;
+	const struct drm_encoder_helper_funcs *funcs = encoder->helper_private;
+	if(funcs){
+		pr_err("oops, panel fall in reset flow");
+		funcs->disable(encoder);
+		funcs->enable(encoder);
+	}
+}
+
+static void esd_check_handler(struct work_struct *work)
+{
+	bool ret = false;
+	u8 value = 0;
+	static int count = 0;
+
+	ret = esd_check_value_read(esd_power_cmd, &value);
+	if (ret && (value != esd_power_value)) {
+        pr_err("expect esd_power_value is %#x, actual vaule is %#x", esd_power_value, value);
+		if (count == 3) {
+			count = 0;
+			schedule_work(&reset_work);
+		} else {
+			count++;
+			schedule_delayed_work(&esd_check_dw, msecs_to_jiffies(1000));
+		}
+	} else {
+		count = 0;
+		schedule_delayed_work(&esd_check_dw, msecs_to_jiffies(1000));
+	}
+}
+#endif
 
 static void panel_simple_sleep(unsigned int msec)
 {
@@ -540,6 +609,9 @@ static int panel_simple_unprepare(struct drm_panel *panel)
 
 	if (!p->prepared)
 		return 0;
+#if MIPI_LCD_ESD_ERR_REBOOT
+	cancel_delayed_work_sync(&esd_check_dw);
+#endif
 
 	if (p->desc->exit_seq) {
 		if (p->dsi)
@@ -568,7 +640,9 @@ static int panel_simple_prepare(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
 	int err;
-
+#if MIPI_LCD_ESD_ERR_REBOOT
+	u8 cmd;
+#endif
 	if (p->prepared)
 		return 0;
 
@@ -601,6 +675,15 @@ static int panel_simple_prepare(struct drm_panel *panel)
 		if (err)
 			dev_err(panel->dev, "failed to send init cmds seq\n");
 	}
+
+#if MIPI_LCD_ESD_ERR_REBOOT
+	mipi_dsi_dcs_get_power_mode(p->dsi,&cmd);
+	printk("esd cmd = 0x%x\n",cmd);
+	if ((esd_power_value != 0) || (esd_power_cmd != 0)) {
+		printk("enable esd check\n");
+		schedule_delayed_work(&esd_check_dw, msecs_to_jiffies(2000));
+	}
+#endif
 
 	p->prepared = true;
 
@@ -688,6 +771,9 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 	struct panel_simple *panel;
 	const char *cmd_type;
 	int err;
+#if MIPI_LCD_ESD_ERR_REBOOT
+	struct device_node *panel_node;
+#endif
 
 	panel = devm_kzalloc(dev, sizeof(*panel), GFP_KERNEL);
 	if (!panel)
@@ -809,6 +895,46 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 		goto free_ddc;
 
 	dev_set_drvdata(dev, panel);
+
+#if MIPI_LCD_ESD_ERR_REBOOT
+	gPanel = panel;
+	panel_node = NULL;
+	if(!panel_node){
+		while ((panel_node = of_find_compatible_node(panel_node, NULL, "simple-panel-dsi")) != NULL){
+			int ret;
+			const char *status = NULL;
+			if((ret = of_property_read_string(panel_node, "status", &status)) != 0){
+				pr_err("esd_check read %s status err: %d", panel_node->full_name, ret);
+				continue;
+			}
+			if(strcmp(status, "okay") != 0){
+				continue;
+			}
+			if((ret = of_property_read_u32(panel_node, "esd_power_value", &esd_power_value)) != 0){
+				pr_err("esd_check read %s esd_power_value err: %d", panel_node->full_name, ret);
+				continue;
+			}
+			if((ret = of_property_read_u32(panel_node, "esd_power_cmd", &esd_power_cmd)) != 0){
+				pr_err("esd_check read %s esd_power_cmd err: %d", panel_node->full_name, ret);
+				continue;
+			}
+			pr_info("esd_check find match panel: %s, esd_power_value: %d, esd_power_cmd: %d",
+					panel_node->full_name, esd_power_value, esd_power_cmd);
+			break;
+		}
+		if(panel_node == NULL){
+			pr_err("esd_check cannot find okay panel");
+		}
+	}
+
+	INIT_DELAYED_WORK(&esd_check_dw, esd_check_handler);
+	INIT_WORK(&reset_work, esd_mipi_reset);
+
+	if ((esd_power_value != 0) || (esd_power_cmd != 0)) {
+		printk("enable esd check\n");
+		schedule_delayed_work(&esd_check_dw, msecs_to_jiffies(1000));
+	}
+#endif
 
 	return 0;
 
@@ -3394,6 +3520,102 @@ static int panel_simple_dsi_of_get_desc_data(struct device *dev,
 	return 0;
 }
 
+static u8 dsi_reg[] = {
+	0x04,
+	0x05,
+	0x09,
+	0x0a,
+	0x0b,
+	0x0c,
+	0x0d,
+	0x0e,
+	0x0f,
+	0x45,
+	0x52,
+	0x54,
+	0x56,
+	0x5f,
+	0x68,
+	0x81,
+	0xb6,
+	0xda,
+	0xdb,
+	0xdc
+};
+
+static ssize_t get_dsi_reg(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int i = 0;
+	u8 data = 0;
+	struct mipi_dsi_device *dsi = container_of(dev, \
+			struct mipi_dsi_device, dev);
+
+	pr_info("start dump regs:\n");
+	for (i = 0; i < sizeof(dsi_reg); i++) {
+		mipi_dsi_dcs_read(dsi, dsi_reg[i], &data, sizeof(dsi_reg[i]));
+		pr_info("reg: %#x  val: %#x\n", dsi_reg[i], data);
+		mdelay(1);
+	}
+
+	return sprintf(buf, "use dmesg command to read regs\n");
+}
+
+static ssize_t dsi_reset_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	esd_mipi_reset(NULL);
+	dev_info(dev, "reset dsi through command\n");
+
+	return count;
+}
+
+static ssize_t mipi_err_read(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", mipi_err_cnt);
+}
+
+static ssize_t mipi_err_clear(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	mipi_err_cnt = 0;
+
+	return count;
+}
+
+static DEVICE_ATTR(dsi_panel, S_IRUSR, get_dsi_reg, NULL);
+static DEVICE_ATTR(dsi_reset, S_IWUSR, NULL, dsi_reset_store);
+static DEVICE_ATTR(mipi_err, S_IRUSR | S_IWUSR, mipi_err_read, mipi_err_clear);
+
+static int add_sysfs_register(struct device *dev)
+{
+	int ret;
+
+	ret = device_create_file(dev, &dev_attr_dsi_panel);
+	if (ret) {
+		dev_err(dev, "failed to create dsi panel device attr\n");
+		goto out;
+	}
+
+	ret = device_create_file(dev, &dev_attr_dsi_reset);
+	if (ret) {
+		dev_err(dev, "failed to create dsi reset device attr\n");
+		goto out;
+	}
+
+	ret = device_create_file(dev, &dev_attr_mipi_err);
+	if (ret) {
+		dev_err(dev, "failed to create dsi mipi err device attr\n");
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
 static int panel_simple_dsi_probe(struct mipi_dsi_device *dsi)
 {
 	struct panel_simple *panel;
@@ -3438,6 +3660,8 @@ static int panel_simple_dsi_probe(struct mipi_dsi_device *dsi)
 
 		drm_panel_remove(&panel->base);
 	}
+
+	add_sysfs_register(dev);
 
 	return err;
 }

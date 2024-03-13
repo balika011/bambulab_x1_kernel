@@ -1,0 +1,742 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2020 Rockchip Electronics Co., Ltd.
+ */
+/dts-v1/;
+
+/*
+ * how to add a new panel
+ * 		add "panel@N" node in dsi, such as panel@3
+ *		  specify status = "disabled"; adc = <adc_of_version>;
+ *		  specify timing3
+ *		  specify port in panel@3-ports: reg = <1>(fixed)
+ * 		  specify panel3_in_dsi in panel@3-ports, note!!: must match with port in dsi-ports
+ *		  specify panel@3-reg = <0>(fixed, mean input device)
+ *		  specify esd_power_value and esd_power_cmd, the value used in panel-simple.c
+ *		add port@3 in dsi-ports
+ * 		  specify reg, note!!: must be different from other ports, and should be [1, 5](kernel driver only support max 5)
+*/
+
+#include "rv1126.dtsi"
+#include "rv1126-bl-p001-v3.dtsi"
+/ {
+	model = "v01 Bamboo Lab 3D Printer C13 Board";
+	compatible = "rockchip,rv1126";
+
+	chosen {
+		bootargs = "earlycon=uart8250,mmio32,0xff570000 console=ttyFIQ0 root=PARTUUID=614e0000-0000 rootfstype=ext4 rootwait snd_aloop.index=7";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		e_stop {
+			gpios = <&gpio2 RK_PC5 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_STOP>;
+			label = "GPIO Key Stop";
+			linux,input-type = <1>;
+			gpio-key,wakeup = <1>;
+			debounce-interval = <100>;
+            pinctrl-names = "default";
+            pinctrl-0 = <&e_stop_pin>;
+		};
+
+		wakeup {
+			gpios = <&gpio0 RK_PA7 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_POWER>;
+			label = "GPIO Wake Up";
+			linux,input-type = <1>;
+			gpio-key,wakeup = <1>;
+			debounce-interval = <100>;
+            pinctrl-names = "default";
+            pinctrl-0 = <&wakeup_pin>;
+		};
+
+		open_door {
+			gpios = <&gpio0 RK_PA6 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_OPEN>;
+			label = "GPIO Open Door";
+			linux,input-type = <1>;
+			gpio-key,wakeup = <1>;
+			debounce-interval = <100>;
+            pinctrl-names = "default";
+            pinctrl-0 = <&open_door_pin>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		work_led {
+			gpios = <&gpio2 RK_PD7 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "timer";
+		};
+
+	    sys_led {
+			gpios = <&gpio2 RK_PD4 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "none";
+		};
+
+	};
+};
+
+&pinctrl {
+    lcd_rst {
+        lcd_rst_gpio: lcd-rst-gpio {
+            rockchip,pins = <2 RK_PA2 RK_FUNC_GPIO &pcfg_pull_none>;
+        };
+    };
+
+	touth_panel {
+		pinctrl_tlsc6x: pinctrl_tlsc6x {
+			rockchip,pins =
+				/* tp rst */
+				<2 RK_PB2 RK_FUNC_GPIO &pcfg_pull_up>,
+				/* tp int */
+				<2 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+	};
+
+    buttons {
+        e_stop_pin: e_stop_pin {
+			rockchip,pins = <2 RK_PC5 RK_FUNC_GPIO &pcfg_pull_up>;
+        };
+
+        wakeup_pin: wakeup_pin {
+			rockchip,pins = <0 RK_PA7 RK_FUNC_GPIO &pcfg_pull_up>;
+        };
+
+        open_door_pin: open_door_pin {
+			rockchip,pins = <0 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
+        };
+    };
+
+    leds {
+        work_led_pin: work_led_pin {
+			rockchip,pins = <2 RK_PD7 RK_FUNC_GPIO &pcfg_pull_down>;
+        };
+
+        sys_led_pin: sys_led_pin {
+			rockchip,pins = <2 RK_PD5 RK_FUNC_GPIO &pcfg_pull_down>;
+        };
+    };
+
+};
+
+&pwm4 {
+	status = "okay";
+	pinctrl-names = "active";
+	pinctrl-0 = <&pwm4m1_pins_pull_down>;
+};
+
+&backlight {
+	status = "okay";
+    pwms = <&pwm4 0 25000 0>;
+	pwm-names = "backlight";
+	enable-gpios = <&gpio1 RK_PD7 GPIO_ACTIVE_HIGH>;
+};
+
+&dsi {
+	status = "okay";
+
+    rockchip,lane-rate = <480>;
+
+	panel@1 {
+		status = "disabled";
+		adc = <333>;
+		esd_power_value = <28>; // 0x1c
+		esd_power_cmd = <10>;
+		compatible = "simple-panel-dsi";
+		reg = <0>;
+		backlight = <&backlight>;
+		power-supply = <&vcc_1v8>;
+		prepare-delay-ms = <5>;
+		reset-delay-ms = <1>;
+		init-delay-ms = <80>;
+		disable-delay-ms = <10>;
+		unprepare-delay-ms = <5>;
+        reset-gpios = <&gpio2 RK_PA2 GPIO_ACTIVE_LOW>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&lcd_rst_gpio>;
+		width-mm = <68>;
+		height-mm = <121>;
+		dsi,flags = <(MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+			      MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_EOT_PACKET)>;
+		dsi,format = <MIPI_DSI_FMT_RGB888>;
+		dsi,lanes = <4>;
+        panel-init-sequence = [
+			39 00 04 B9 FF 83 94
+			39 00 07 BA 63 03 68 6B B2 C0
+			39 00 0B B1 48 19 79 09 32 64 74 34 61 39
+			39 00 02 BD 01
+			39 00 05 B1 76 77 11 00
+			39 00 02 BD 00
+			39 00 07 B2 00 80 64 07 08 2F
+			39 00 16 B4 0A 77 0A 77 00 FF 00 00 FF 35 00 3F 01 70 01 70 01 70 01 0C 76
+			39 00 03 B6 3D 3D
+			39 05 3B E0 00 0E 19 20 23 27 2B 29 55 67 78 77 81 94 99 9D AB AE AA B7 C6 61 5F 63 66 6A 71 7E 7F 00 0E 19 20 23 27 2B 29 55 67 78 77 81 94 99 9D AB AE AA B7 C6 61 5F 63 66 6A 71 7E 7F
+			39 00 02 D2 CC
+			39 05 22 D3 00 00 00 00 00 00 08 00 32 10 02 00 02 32 15 09 05 09 32 10 00 00 00 37 03 06 06 37 00 00 00 07 40
+			39 05 2D D5 19 19 25 24 18 18 18 18 18 18 07 06 07 06 05 04 05 04 03 02 03 02 01 00 01 00 21 20 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18
+			39 05 2D D6 18 18 20 21 19 19 18 18 18 18 00 01 00 01 02 03 02 03 04 05 04 05 06 07 06 07 24 25 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18
+			39 00 02 BD 02
+			39 00 0D D8 FF FF FF FF 00 00 FF FF FF FF 00 00
+			39 00 02 BD 00
+			39 00 02 CC 0B
+			39 00 03 C0 1F 31
+			05 78 01 11
+			05 0A 01 29
+			];
+        panel-exit-sequence = [
+            05 14 01 28
+            05 32 01 10
+            ];
+        display-timings {
+			native-mode = <&timing1>;
+			timing1: timing1 {
+				clock-frequency = <71000000>;
+				hactive = <720>;
+				vactive = <1280>;
+				hfront-porch = <70>;
+				hsync-len = <20>;
+				hback-porch = <60>;
+				vfront-porch = <20>;
+				vsync-len = <4>;
+				vback-porch = <27>;
+				hsync-active = <0>;
+				vsync-active = <0>;
+				de-active = <0>;
+				pixelclk-active = <0>;
+			};
+		};
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			port@1 {
+				reg = <1>;
+				panel1_in_dsi: endpoint {
+					remote-endpoint = <&dsi_out_panel1>;
+				};
+			};
+		};
+	};
+
+	panel@2 {
+		status = "disabled";
+		adc = <1234>;
+		esd_power_value = <128>; // 0x80
+		esd_power_cmd = <9>;
+		compatible = "simple-panel-dsi";
+		reg = <0>;
+		backlight = <&backlight>;
+		power-supply = <&vcc_1v8>;
+		prepare-delay-ms = <5>;
+		reset-delay-ms = <1>;
+		init-delay-ms = <80>;
+		disable-delay-ms = <10>;
+		unprepare-delay-ms = <5>;
+
+        reset-gpios = <&gpio2 RK_PA2 GPIO_ACTIVE_LOW>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&lcd_rst_gpio>;
+
+		width-mm = <68>;
+		height-mm = <121>;
+
+		dsi,flags = <(MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+			      MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_EOT_PACKET)>;
+		dsi,format = <MIPI_DSI_FMT_RGB888>;
+		dsi,lanes = <4>;
+
+		panel-init-sequence = [
+			39 00 04 B9 F1 12 83
+			39 00 04 B2 C8 12 F0
+			39 00 0B B3 10 10 28 28 03 FF 00 00 00 00
+			39 00 02 B4 80
+			39 00 03 B5 13 13
+			39 00 03 B6 6B 6B
+			39 00 02 B8 26
+			39 00 1C BA 33 81 05 F9 0E 06 20 00 00 00 00 00 00 00 44 25 00 91 0A 00 00 01 4F 01 00 00 37
+			39 00 02 BC 4E
+			39 00 04 BF 02 11 00
+			39 00 0A C0 73 73 50 50 00 00 12 70 00
+			39 00 0D C1 84 00 32 32 99 F1 AF AF 8C 8C 37 37
+			39 00 07 C6 82 00 BF FF 00 E0
+			39 00 02 CC 0B
+			39 00 23 E0 00 1A 1F 2D 32 3F 4F 41 07 0C 0C 11 12 10 13 11 19 00 1A 1F 2D 32 3F 4F 41 07 0C 0C 11 12 10 13 11 19
+			39 00 0F E3 03 03 03 03 00 03 00 00 00 00 FF 80 C0 10
+			39 00 40 E9 C8 10 06 05 01 80 5C 12 31 23 4F 82 80 5C 47 08 00 20 02 00 00 00 00 20 02 00 00 00 F5 88 87 75 53 31 11 88 88 88 88 F4 88 86 64 42 20 00 88 88 88 88 00 00 00 00 00 00 00 00 00 00 00 00 00
+			39 00 3E EA 00 1A 00 00 00 00 02 00 00 00 00 00 80 F8 80 02 24 46 64 88 88 88 88 81 F8 81 13 35 57 75 88 88 88 88 23 00 00 00 C6 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 40 80 5C 00 00 00 00
+			39 00 02 C7 10
+			05 FA 01 11
+			05 32 01 29
+			];
+
+        panel-exit-sequence = [
+            05 14 01 28
+            05 32 01 10
+            ];
+
+        display-timings {
+			native-mode = <&timing2>;
+
+			timing2: timing2 {
+				clock-frequency = <71000000>;
+				hactive = <720>;
+				vactive = <1280>;
+				hfront-porch = <100>;
+				hsync-len = <30>;
+				hback-porch = <70>;
+				vfront-porch = <16>;
+				vsync-len = <2>;
+				vback-porch = <10>;
+				hsync-active = <0>;
+				vsync-active = <0>;
+				de-active = <0>;
+				pixelclk-active = <0>;
+			};
+		};
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@2 {
+				reg = <1>;
+				panel2_in_dsi: endpoint {
+					remote-endpoint = <&dsi_out_panel2>;
+				};
+			};
+		};
+	};
+
+	panel@3 {
+		status = "disabled";
+		adc = <505>;
+		esd_power_value = <28>; // 0x1c
+		esd_power_cmd = <10>;
+		compatible = "simple-panel-dsi";
+		reg = <0>;
+		backlight = <&backlight>;
+		power-supply = <&vcc_1v8>;
+		prepare-delay-ms = <5>;
+		reset-delay-ms = <1>;
+		init-delay-ms = <80>;
+		disable-delay-ms = <10>;
+		unprepare-delay-ms = <5>;
+
+        reset-gpios = <&gpio2 RK_PA2 GPIO_ACTIVE_LOW>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&lcd_rst_gpio>;
+
+		width-mm = <68>;
+		height-mm = <121>;
+
+		dsi,flags = <(MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+			      MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_EOT_PACKET)>;
+		dsi,format = <MIPI_DSI_FMT_RGB888>;
+		dsi,lanes = <4>;
+
+		panel-init-sequence = [
+			39 00 04 B9 FF 83 94
+			39 00 0B B1 50 15 75 09 32 44 71 31 55 2F
+			39 00 07 BA 63 03 68 6B B2 C0
+			15 00 02 D2 88
+			39 00 06 B2 00 80 64 10 07
+			39 00 16 B4 05 70 05 70 01 70 01 0C 86 75 00 3F 01 74 01 74 01 74 01 0C 86
+			39 00 22 D3 00 00 07 07 40 1E 08 00 32 10 08 00 08 54 15 10 05 04 02 12 10 05 07 33 34 0C 0C 37 10 07 17 11 40
+			39 00 2D D5 19 19 18 18 1B 1B 1A 1A 04 05 06 07 00 01 02 03 20 21 18 18 22 23 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18
+			39 00 2D D6 18 18 19 19 1B 1B 1A 1A 03 02 01 00 07 06 05 04 23 22 18 18 18 18 18 18 18 18 18 18 18 18 21 20 18 18 18 18 18 18 18 18 18 18 18 18
+			39 00 3B E0 00 03 09 11 11 14 18 16 2E 3D 4D 4D 58 6C 72 78 88 8B 86 A4 B2 58 55 59 5B 5D 60 64 7F 00 03 09 0F 11 14 18 16 2E 3D 4D 4D 58 6D 73 78 88 8B 87 A5 B2 58 55 58 5B 5D 61 65 7F
+			15 00 02 CC 0B
+			39 00 03 C0 1F 31
+			15 00 02 BD 01
+			15 00 02 B1 00
+			15 00 02 BD 00
+			39 00 08 BF 40 81 50 00 1A FC 01
+			15 00 02 C6 EF
+			15 00 02 D4 02
+			05 78 01 11
+			05 64 01 29
+			15 32 02 51 FF
+			15 32 02 55 00
+			15 32 02 53 24
+			];
+
+        panel-exit-sequence = [
+            05 14 01 28
+            05 32 01 10
+            ];
+
+        display-timings {
+			native-mode = <&timing3>;
+
+			timing3: timing3 {
+				clock-frequency = <71000000>;
+				hactive = <720>;
+				vactive = <1280>;
+				hfront-porch = <70>;
+				hsync-len = <20>;
+				hback-porch = <60>;
+				vfront-porch = <20>;
+				vsync-len = <4>;
+				vback-porch = <27>;
+				hsync-active = <0>;
+				vsync-active = <0>;
+				de-active = <0>;
+				pixelclk-active = <0>;
+			};
+		};
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@3 {
+				reg = <1>;
+				panel3_in_dsi: endpoint {
+					remote-endpoint = <&dsi_out_panel3>;
+				};
+			};
+		};
+	};
+
+	panel@4 {
+		status = "disabled";
+		adc = <0>;
+		esd_power_value = <156>; // 0x9c
+		esd_power_cmd = <10>;
+		compatible = "simple-panel-dsi";
+		reg = <0>;
+		backlight = <&backlight>;
+		power-supply = <&vcc_1v8>;
+		prepare-delay-ms = <5>;
+		reset-delay-ms = <1>;
+		init-delay-ms = <80>;
+		disable-delay-ms = <10>;
+		unprepare-delay-ms = <5>;
+
+        reset-gpios = <&gpio2 RK_PA2 GPIO_ACTIVE_LOW>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&lcd_rst_gpio>;
+
+		width-mm = <68>;
+		height-mm = <121>;
+
+		dsi,flags = <(MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+			      MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_EOT_PACKET)>;
+		dsi,format = <MIPI_DSI_FMT_RGB888>;
+		dsi,lanes = <4>;
+
+		panel-init-sequence = [
+			29 01 02 41 5A
+			29 01 02 4C 03
+			29 01 03 41 5A 24
+			29 01 02 90 5A
+			29 01 03 41 5A 08
+			29 01 04 80 C8 2C 01
+			29 01 03 41 5A 09
+			29 01 11 80 5A 51 B5 2A 6C C5 4A 01 40 62 0F 82 20 08 F0 B7
+			29 01 11 90 00 24 42 0A E3 91 A4 F0 C2 B9 6B 20 19 A1 26 00
+			29 01 11 A0 51 55 55 00 A0 4C 06 11 0D 60 00 FF FF 03 A5 E6
+			29 01 11 B0 08 3A 12 64 0B 00 00 11 00 60 00 FF FF 03 FF 34
+			29 01 09 C0 0C FF 18 9F 0F 00 08 00
+			29 01 03 41 5A 0B
+			29 01 11 80 00 00 20 44 08 00 60 47 00 00 10 22 04 00 B0 23
+			29 01 03 90 15 00
+			29 01 03 41 5A 0C
+			29 01 11 80 FA 68 68 01 28 74 A0 04 00 60 15 00 50 15 56 51
+			29 01 11 90 15 55 61 15 00 60 15 00 50 15 56 51 15 55 61 95
+			29 01 11 A0 AB 18 00 05 00 05 00 05 80 4C 29 84 52 01 09 00
+			29 01 03 B0 00 00
+			29 01 03 41 5A 0D
+			29 01 08 80 F0 B1 71 EF 4B C0 80
+			29 01 03 41 5A 0E
+			29 01 09 80 FF 01 55 55 32 88 88 1C
+			29 01 03 41 5A 0F
+			29 01 11 80 B5 05 82 C0 12 08 64 08 52 51 58 49 03 52 4C 4C
+			29 01 11 90 68 68 68 4C 4C 7C 14 00 20 06 C2 00 04 06 0C 00
+			29 01 05 A0 00 92 00 00
+			29 01 03 41 5A 10
+			29 01 11 80 00 00 03 E7 1F 17 10 48 00 5A CD 18 30 88 41 8A
+			29 01 10 90 39 28 A9 C5 9A 7B F0 07 7E E0 07 7E 20 10 00
+			29 01 03 41 5A 11
+			29 01 11 80 46 77 03 40 CA F3 FF 83 30 08 C4 06 A1 D8 24 18
+			29 01 11 90 30 C6 66 C1 80 31 15 CB E5 D2 68 6C 36 1D 04 C8
+			29 01 11 A0 B0 D9 88 60 B0 81 40 1A 1B 48 63 03 B9 00 1C 80
+			29 01 11 B0 50 30 00 E0 E1 01 00 28 0E 06 43 55 55 55 55 55
+			29 01 11 C0 95 88 88 88 88 88 C8 08 86 C6 E3 81 00 20 00 21
+			29 01 11 D0 42 88 00 00 00 00 40 00 00 31 04 41 06 00 00 00
+			29 01 11 E0 00 92 04 00 92 04 00 00 00 00 92 04 00 85 11 0C
+			29 01 10 F0 00 00 40 00 00 00 00 5E 4A 01 78 00 08 00 00
+			29 01 03 41 5A 12
+			29 01 11 80 00 00 00 00 00 02 03 00 00 00 00 02 03 01 41 37
+			29 01 11 90 F1 E7 00 00 00 00 00 00 00 00 00 00 00 2D 23 05
+			29 01 08 A0 FB 08 2D 23 05 FB 0C
+			29 01 03 41 5A 13
+			29 01 11 80 FD 0F 00 0C 00 00 00 00 01 08 01 1C 44 0C CE E7
+			29 01 0F 90 62 0E 24 98 AC 21 01 00 D0 93 24 49 06 20
+			29 01 03 41 5A 14
+			29 01 11 80 01 02 41 36 E9 EF F7 FB FD 7E 01 00 00 40 C5 C5
+			29 01 11 90 C2 3D 20 26 16 EE 01 5B B0 70 0F D8 84 85 7B 00
+			29 01 11 A0 00 FC 7E 00 00 E0 F7 03 00 80 82 B5 E2 F7 47 00
+			29 01 11 B0 D8 89 DF 1F 01 00 00 00 00 3C A8 83 2A 00 40 A1
+			29 01 11 C0 50 78 07 0B F7 80 51 1C 6F 60 E1 1E 30 8A E3 05
+			29 01 11 D0 2C DC 03 46 71 BC 82 85 7B C0 28 8E 97 B0 70 0F
+			29 01 11 E0 18 C5 F1 1A 16 EE 01 A3 38 5E C4 C2 3D 60 14 C7
+			29 01 11 F0 AB 58 B8 07 8C E2 18 01 BF DF 08 00 00 00 00 00
+			29 01 03 41 5A 15
+			29 01 11 80 00 00 00 00 00 00 00 00 00 00 00 00 02 D4 E0 F7
+			29 01 11 90 A3 00 80 62 C5 A8 C5 07 C9 90 5D 31 6A F1 41 8C
+			29 01 11 A0 78 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+			29 01 11 B0 00 00 00 00 00 00 00 00 13 00 F0 00 94 95 5A 57
+			29 01 11 C0 75 5D 19 06 41 08 02 00 A0 B6 6D DB B6 55 A5 75
+			29 01 11 D0 5D D7 55 10 0C 43 51 1C C7 6A DB B6 6D DB D5 5A
+			29 01 11 E0 57 75 5D 1D 47 51 0C 43 10 A4 B6 6D DB B6 55 A1
+			29 01 11 F0 75 5D D7 15 00 08 02 41 18 86 6A DB B6 6D 5B 00
+			29 01 03 41 5A 16
+			29 01 11 80 02 42 41 01 00 00 00 00 00 00 00 00 00 00 00 00
+			29 01 07 90 00 00 00 00 F0 20
+			29 01 03 41 5A 18
+			29 01 11 80 EF BD F7 DE 7B EF BD 07 08 08 0A 0C 0C 0C 0C 0C
+			29 01 11 90 0C 0C 0C 5C 09 A8 AA AA AA AA AA AA AA AA AA 5A
+			29 01 11 A0 59 59 59 59 59 59 59 59 59 59 59 09 04 FF 00 80
+			29 01 10 B0 80 00 04 20 00 01 08 40 00 02 10 80 00 04 00
+			29 01 03 41 5A 19
+			29 01 11 80 C0 AF A3 9B 92 8D 8A 86 84 83 82 81 00 50 F6 CF
+			29 01 11 90 FC 2F F3 EF CF BF 0F FF AF B5 71 0E 6C 4A 69 08
+			29 01 05 A0 00 00 08 00
+			29 01 03 41 5A 1A
+			29 01 11 80 00 04 08 0C 00 10 14 18 1C 00 20 28 30 38 00 40
+			29 01 11 90 48 50 58 00 60 68 70 78 00 80 88 90 98 00 A0 A8
+			29 01 11 A0 B0 B8 00 C0 C8 D0 D8 00 E0 E8 F0 F8 00 FC FE FF
+			29 01 11 B0 00 00 04 08 0C 00 10 14 18 1C 00 20 28 30 38 00
+			29 01 11 C0 40 48 50 58 00 60 68 70 78 00 80 88 90 98 00 A0
+			29 01 11 D0 A8 B0 B8 00 C0 C8 D0 D8 00 E0 E8 F0 F8 00 FC FE
+			29 01 11 E0 FF 00 00 04 08 0C 00 10 14 18 1C 00 20 28 30 38
+			29 01 11 F0 00 40 48 50 58 00 60 68 70 78 00 80 88 90 98 00
+			29 01 03 41 5A 1B
+			29 01 11 80 A0 A8 B0 B8 00 C0 C8 D0 D8 00 E0 E8 F0 F8 00 FC
+			29 01 05 90 FE FF 00 00
+			29 01 03 41 5A 20
+			29 01 08 80 81 00 00 00 00 00 00
+			29 01 03 41 5A 22
+			29 01 0E 80 2D D3 00 55 55 55 55 55 55 55 55 9F 00
+			29 01 03 41 5A 23
+			29 01 11 80 01 05 00 05 00 00 00 00 00 00 00 00 00 00 00 00
+			29 01 0D 90 FF 0F 00 00 00 03 00 00 00 FF 07 35
+			29 01 03 41 5A 24
+			29 01 11 80 00 03 00 FF FF 20 00 00 00 00 00 00 00 00 37 4C
+			29 01 11 90 5A 5A 5A 55 00 00 00 00 00 00 00 00 00 00 00 00
+			29 01 02 42 24
+			29 01 02 90 00
+			29 01 03 41 5A 2F
+			29 01 02 19 00
+			05 78 01 11
+			05 64 01 29
+		];
+
+        panel-exit-sequence = [
+            05 14 01 28
+            05 32 01 10
+		];
+
+        display-timings {
+			native-mode = <&timing4>;
+
+			timing4: timing4 {
+				clock-frequency = <73000200>;
+				hactive = <720>;
+				vactive = <1280>;
+				hfront-porch = <40>;
+				hsync-len = <16>;
+				hback-porch = <25>;
+				vfront-porch = <125>;
+				vsync-len = <8>;
+				vback-porch = <105>;
+				hsync-active = <0>;
+				vsync-active = <0>;
+				de-active = <0>;
+				pixelclk-active = <0>;
+			};
+		};
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@4 {
+				reg = <1>;
+				panel4_in_dsi: endpoint {
+					remote-endpoint = <&dsi_out_panel4>;
+				};
+			};
+		};
+	};
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port {
+			dsi_in_vop: endpoint {
+				remote-endpoint = <&vop_out_dsi>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+			dsi_out_panel1: endpoint {
+				remote-endpoint = <&panel1_in_dsi>;
+			};
+		};
+
+		port@2 {
+			reg = <2>;
+			dsi_out_panel2: endpoint {
+				remote-endpoint = <&panel2_in_dsi>;
+			};
+		};
+
+		port@3 {
+			reg = <3>;
+			dsi_out_panel3: endpoint {
+				remote-endpoint = <&panel3_in_dsi>;
+			};
+		};
+
+		port@4 {
+			reg = <4>;
+			dsi_out_panel4: endpoint {
+				remote-endpoint = <&panel4_in_dsi>;
+			};
+		};
+	};
+
+};
+
+&i2c1 {
+	status = "okay";
+	clock-frequency = <400000>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	ov2740: ov2740@36 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "ovti,ov2740";
+		reg = <0x36>;
+
+		clocks = <&cru CLK_MIPICSI_OUT>;
+		clock-names = "xvclk";
+
+		power-domains = <&power RV1126_PD_VI>;
+		pinctrl-names = "rockchip,camera_default";
+		pinctrl-0 = <&mipicsi_clk0>;
+		power-gpios = <&gpio3 RK_PA6 GPIO_ACTIVE_HIGH>;
+		pwdn-gpios = <&gpio1 RK_PD4 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&gpio1 RK_PD4 GPIO_ACTIVE_LOW>;
+		vsync-gpios = <&gpio1 RK_PD5 GPIO_ACTIVE_HIGH>;
+
+		avdd-supply = <&vcc_avdd>;
+		dovdd-supply = <&vcc_dovdd>;
+		dvdd-supply = <&vcc_dvdd>;
+
+		rockchip,camera-module-index = <0>;
+		rockchip,camera-module-facing = "front";
+		rockchip,camera-module-name = "YT-RV1109-2-V1";
+		rockchip,camera-module-lens-name = "40IR-2MP-F20";
+		port {
+			reg = <0x7010 0x100>;
+			ucam_out0: endpoint {
+				remote-endpoint = <&mipi_in_ucam0>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
+};
+
+&i2c5 {
+	status = "okay";
+	pinctrl-0 = <&i2c5m2_xfer>;
+	clock-frequency = <400000>;
+
+	tlsc6x_ts@2e {
+		compatible = "tlsc6x,tlsc6x_ts";
+		reg = <0x2e>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_tlsc6x>;
+		tlsc6x,irq-gpio = <&gpio2 RK_PA6 IRQ_TYPE_EDGE_FALLING>;
+		tlsc6x,reset-gpio = <&gpio2 RK_PB2 GPIO_ACTIVE_LOW>;
+		TP_MAX_X = <720>;
+		TP_MAX_Y = <1280>;
+	};
+
+	focaltech@38{
+		compatible = "focaltech,fts";
+		reg = <0x38>;
+		//vdd-supply = <&pm8916_l15>;
+		//vcc_i2c-supply = <&pm8916_l16>;
+		focaltech,irq-gpio = <&gpio2 RK_PA6 IRQ_TYPE_EDGE_FALLING>;
+		focaltech,reset-gpio = <&gpio2 RK_PB2 GPIO_ACTIVE_LOW>;
+		interrupt-parent = <&gpio2>;
+		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+		focaltech,max-touch-number = <10>;
+		focaltech,display-coords =  <0 0 719 1279>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_tlsc6x>;
+
+		// pinctrl-names = "pmx_ts_active","pmx_ts_suspend","pmx_ts_release";
+		// pinctrl-0 = <&ts_int_active &ts_reset_active>;
+		// pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
+		// pinctrl-2 = <&ts_release>;
+
+		/*
+		focaltech,have-key;
+		focaltech,key-number = <3>;
+		focaltech,keys = <139 102 158>;
+		focaltech,key-x-coords = <200 600 800>;
+		focaltech,key-y-coords = <2000 2000 2000>;
+		*/
+	};
+};
+
+&uart1 {
+    status = "okay";
+    pinctrl-names = "default";
+    dma-names = "tx", "rx";
+    pinctrl-0 = <&uart1m0_xfer>;
+};
+
+&sdmmc {
+        max-frequency = <25000000>;
+};
+
+&gmac {
+	phy-mode = "rmii";
+	clock_in_out = "output";
+
+	snps,reset-gpio = <&gpio2 RK_PC7 GPIO_ACTIVE_LOW>;
+	snps,reset-active-low;
+	snps,reset-delays-us = <0 20000 150000>;
+
+	assigned-clocks = <&cru CLK_GMAC_SRC_M1>, <&cru CLK_GMAC_SRC>, <&cru CLK_GMAC_TX_RX>;
+	assigned-clock-rates = <0>, <50000000>;
+	assigned-clock-parents = <&cru CLK_GMAC_RGMII_M1>, <&cru CLK_GMAC_SRC_M1>, <&cru RMII_MODE_CLK>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&rmiim1_miim &rgmiim1_rxer &rmiim1_bus2 &rgmiim1_mclkinout>;
+
+	phy-handle = <&phy>;
+	status = "okay";
+};
+
+&mdio {
+	phy: phy@0 {
+		compatible = "ethernet-phy-ieee802.3-c22";
+		reg = <0x0>;
+	};
+};
