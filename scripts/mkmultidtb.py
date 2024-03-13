@@ -44,6 +44,12 @@ DTBS['rv1126-c13-v2.dtb'] = OrderedDict([
                                 ('rv1126-c13-v1', '#_saradc_ch1=427'),# 0.75v
 				('rv1126-c13-v2', '#_saradc_ch1=512')])# 0.9v
 
+DTBS['BBL'] = OrderedDict([('rv1126-c13-v1', '#_saradc_ch1=427'),# 0.75v
+				('rv1126-c13-v2', '#_saradc_ch1=512'),# 0.9v
+				('rv1126-bl-p001-v5', '#_saradc_ch1=683')])# 1.2v
+
+dts_path = 'arch/arm/boot/dts/'
+
 def main():
     if (len(sys.argv) < 2) or (sys.argv[1] == '-h'):
         print(__doc__)
@@ -56,12 +62,12 @@ def main():
 
     for dtb, value in TARGET_DTBS.items():
         if default_dtb:
-            ori_file = 'arch/arm64/boot/dts/rockchip/' + dtb + '.dtb'
+            ori_file = dts_path + dtb + '.dtb'
             shutil.copyfile(ori_file, "rk-kernel.dtb")
             target_dtb_list += 'rk-kernel.dtb '
             default_dtb = False
         new_file = dtb + value + '.dtb'
-        ori_file = 'arch/arm64/boot/dts/rockchip/' + dtb + '.dtb'
+        ori_file = dts_path + dtb + '.dtb'
         shutil.copyfile(ori_file, new_file)
         target_dtb_list += ' ' + new_file
 

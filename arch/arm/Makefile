@@ -412,5 +412,8 @@ endif
 %.img: %.dtb kernel.img $(LOGO) $(LOGO_KERNEL)
 	$(Q)$(srctree)/scripts/mkimg --dtb $*.dtb
 
+boot.img: kernel.img $(LOGO) $(LOGO_KERNEL)
+	$(Q)$(srctree)/scripts/mkimg --dtb BBL
+
 CLEAN_DIRS += out
 CLEAN_FILES += boot.img kernel.img resource.img zboot.img
