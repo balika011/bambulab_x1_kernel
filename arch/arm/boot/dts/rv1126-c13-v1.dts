@@ -144,7 +144,11 @@
     rockchip,lane-rate = <480>;
 
 	panel@1 {
-		status = "disabled";
+		status = "okay";
+		tp-node = <&tlsc6x_ts>;
+		id-regs-len = <3>;
+		id-regs = <0xda 0xdb 0xdc>;
+		id-targets = <0x83 0x94 0xf>;
 		adc = <333>;
 		esd_power_value = <28>; // 0x1c
 		esd_power_cmd = <10>;
@@ -224,7 +228,11 @@
 	};
 
 	panel@2 {
-		status = "disabled";
+		status = "okay";
+		tp-node = <&tlsc6x_ts>;
+		id-regs-len = <3>;
+		id-regs = <0xda 0xdb 0xdc>;
+		id-targets = <0x38 0x21 0x1f>;
 		adc = <1234>;
 		esd_power_value = <128>; // 0x80
 		esd_power_cmd = <9>;
@@ -313,7 +321,11 @@
 	};
 
 	panel@3 {
-		status = "disabled";
+		status = "okay";
+		tp-node = <&tlsc6x_ts>;
+		id-regs-len = <3>;
+		id-regs = <0xda 0xdb 0xdc>;
+		id-targets = <0x83 0x94 0xf>;
 		adc = <505>;
 		esd_power_value = <28>; // 0x1c
 		esd_power_cmd = <10>;
@@ -404,7 +416,11 @@
 	};
 
 	panel@4 {
-		status = "disabled";
+		status = "okay";
+		tp-node = <&focaltech>;
+		id-regs-len = <3>;
+		id-regs = <0xda 0xdb 0xdc>;
+		id-targets = <0x40 0x05 0x67>;
 		adc = <0>;
 		esd_power_value = <156>; // 0x9c
 		esd_power_cmd = <10>;
@@ -663,7 +679,8 @@
 	pinctrl-0 = <&i2c5m2_xfer>;
 	clock-frequency = <400000>;
 
-	tlsc6x_ts@2e {
+	tlsc6x_ts: tlsc6x_ts@2e {
+		status = "disa";
 		compatible = "tlsc6x,tlsc6x_ts";
 		reg = <0x2e>;
 		pinctrl-names = "default";
@@ -674,7 +691,8 @@
 		TP_MAX_Y = <1280>;
 	};
 
-	focaltech@38 {
+	focaltech: focaltech@38 {
+		status = "disa";
 		compatible = "focaltech,fts";
 		reg = <0x38>;
 		focaltech,irq-gpio = <&gpio2 RK_PA6 IRQ_TYPE_EDGE_FALLING>;
@@ -713,9 +731,10 @@
 	assigned-clock-parents = <&cru CLK_GMAC_RGMII_M1>, <&cru CLK_GMAC_SRC_M1>, <&cru RMII_MODE_CLK>;
 
 	pinctrl-names = "default";
-	pinctrl-0 = <&rmiim1_miim &rgmiim1_rxer &rmiim1_bus2 &rgmiim1_mclkinout>;
+	pinctrl-0 = <&rmiim1_miim &rgmiim1_rxer &rmiim1_bus2 &rgmiim1_mclkinout &eth_poweren_gpio>;
 
 	phy-handle = <&phy>;
+	phy-poweren_gpio = <&gpio2 RK_PA4 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
 
@@ -723,5 +742,25 @@
 	phy: phy@0 {
 		compatible = "ethernet-phy-ieee802.3-c22";
 		reg = <0x0>;
+	};
+};
+
+&wireless_wlan {
+	pinctrl-0 = <&wifi_wake_host &wifi_poweren_gpio>;
+	WIFI,poweren_gpio = <&gpio2 RK_PB1 GPIO_ACTIVE_HIGH>;
+};
+
+&pinctrl {
+	wireless-wlan {
+		/omit-if-no-ref/
+		wifi_poweren_gpio: wifi-poweren-gpio {
+			rockchip,pins = <2 RK_PB1 0 &pcfg_pull_none>;
+		};
+	};
+	ethernet {
+		/omit-if-no-ref/
+		eth_poweren_gpio: eth-poweren-gpio {
+			rockchip,pins = <2 RK_PA4 0 &pcfg_pull_none>;
+		};
 	};
 };
