@@ -674,33 +674,18 @@
 		TP_MAX_Y = <1280>;
 	};
 
-	focaltech@38{
+	focaltech@38 {
 		compatible = "focaltech,fts";
 		reg = <0x38>;
-		//vdd-supply = <&pm8916_l15>;
-		//vcc_i2c-supply = <&pm8916_l16>;
 		focaltech,irq-gpio = <&gpio2 RK_PA6 IRQ_TYPE_EDGE_FALLING>;
 		focaltech,reset-gpio = <&gpio2 RK_PB2 GPIO_ACTIVE_LOW>;
 		interrupt-parent = <&gpio2>;
 		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
 		focaltech,max-touch-number = <10>;
-		focaltech,display-coords =  <0 0 719 1279>;
+		focaltech,display-coords = <0 0 719 1279>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_tlsc6x>;
-
-		// pinctrl-names = "pmx_ts_active","pmx_ts_suspend","pmx_ts_release";
-		// pinctrl-0 = <&ts_int_active &ts_reset_active>;
-		// pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
-		// pinctrl-2 = <&ts_release>;
-
-		/*
-		focaltech,have-key;
-		focaltech,key-number = <3>;
-		focaltech,keys = <139 102 158>;
-		focaltech,key-x-coords = <200 600 800>;
-		focaltech,key-y-coords = <2000 2000 2000>;
-		*/
 	};
 };
 
