@@ -730,9 +730,10 @@
 	assigned-clock-parents = <&cru CLK_GMAC_RGMII_M1>, <&cru CLK_GMAC_SRC_M1>, <&cru RMII_MODE_CLK>;
 
 	pinctrl-names = "default";
-	pinctrl-0 = <&rmiim1_miim &rgmiim1_rxer &rmiim1_bus2 &rgmiim1_mclkinout>;
+	pinctrl-0 = <&rmiim1_miim &rgmiim1_rxer &rmiim1_bus2 &rgmiim1_mclkinout &eth_poweren_gpio>;
 
 	phy-handle = <&phy>;
+	phy-poweren_gpio = <&gpio2 RK_PA4 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
 
@@ -777,6 +778,12 @@
 		/omit-if-no-ref/
 		wifi_poweren_gpio: wifi-poweren-gpio {
 			rockchip,pins = <2 RK_PB1 0 &pcfg_pull_none>;
+		};
+	};
+	ethernet {
+		/omit-if-no-ref/
+		eth_poweren_gpio: eth-poweren-gpio {
+			rockchip,pins = <2 RK_PA4 0 &pcfg_pull_none>;
 		};
 	};
 };

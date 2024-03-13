@@ -24,6 +24,7 @@
 #include <linux/gpio.h>
 #include <linux/module.h>
 #include <linux/of_gpio.h>
+#include <dt-bindings/gpio/gpio.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
@@ -73,6 +74,9 @@ struct rk_priv_data {
 	int rx_delay;
 
 	struct regmap *grf;
+
+	int poweren_gpio;
+	int poweren_enable;
 };
 
 #define HIWORD_UPDATE(val, mask, shift) \
@@ -1509,20 +1513,31 @@ static int gmac_clk_enable(struct rk_priv_data *bsp_priv, bool enable)
 static int phy_power_on(struct rk_priv_data *bsp_priv, bool enable)
 {
 	struct regulator *ldo = bsp_priv->regulator;
+	int poweren_gpio = bsp_priv->poweren_gpio;
+	int poweren_enable = bsp_priv->poweren_enable;
 	int ret;
 	struct device *dev = &bsp_priv->pdev->dev;
 
-	if (!ldo)
-		return 0;
+	if (ldo)
+	{
+		if (enable) {
+			ret = regulator_enable(ldo);
+			if (ret)
+				dev_err(dev, "fail to enable phy-supply\n");
+		} else {
+			ret = regulator_disable(ldo);
+			if (ret)
+				dev_err(dev, "fail to disable phy-supply\n");
+		}
+	}
 
-	if (enable) {
-		ret = regulator_enable(ldo);
-		if (ret)
-			dev_err(dev, "fail to enable phy-supply\n");
-	} else {
-		ret = regulator_disable(ldo);
-		if (ret)
-			dev_err(dev, "fail to disable phy-supply\n");
+	if (gpio_is_valid(poweren_gpio))
+	{
+		if (enable) {
+			gpio_direction_output(poweren_gpio, poweren_enable);
+		} else {
+			gpio_direction_output(poweren_gpio, !poweren_enable);
+		}
 	}
 
 	return 0;
@@ -1537,6 +1552,8 @@ static struct rk_priv_data *rk_gmac_setup(struct platform_device *pdev,
 	int ret;
 	const char *strings = NULL;
 	int value;
+	int gpio;
+	enum of_gpio_flags flags;
 
 	bsp_priv = devm_kzalloc(dev, sizeof(*bsp_priv), GFP_KERNEL);
 	if (!bsp_priv)
@@ -1553,6 +1570,15 @@ static struct rk_priv_data *rk_gmac_setup(struct platform_device *pdev,
 		}
 		dev_err(dev, "no regulator found\n");
 		bsp_priv->regulator = NULL;
+	}
+
+	gpio = of_get_named_gpio_flags(dev->of_node, "phy-poweren_gpio", 0, &flags);
+	if (gpio_is_valid(gpio)) {
+		bsp_priv->poweren_gpio = gpio;
+		bsp_priv->poweren_enable = (flags == GPIO_ACTIVE_HIGH) ? 1 : 0;
+		dev_info(dev, "%s: phy-poweren_gpio = %d flags = %d.\n", __func__, gpio, flags);
+	} else {
+		bsp_priv->poweren_gpio = -1;
 	}
 
 	ret = of_property_read_string(dev->of_node, "clock_in_out", &strings);
@@ -1831,6 +1857,9 @@ static int rk_gmac_remove(struct platform_device *pdev)
 
 	rk_gmac_powerdown(bsp_priv);
 	dwmac_rk_remove_loopback_sysfs(&pdev->dev);
+	
+	if (gpio_is_valid(bsp_priv->poweren_gpio))
+		gpio_free(bsp_priv->poweren_gpio);
 
 	return ret;
 }
