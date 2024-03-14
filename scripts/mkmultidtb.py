@@ -44,7 +44,8 @@ DTBS['rv1126-c13-v2.dtb'] = OrderedDict([
                                 ('rv1126-c13-v1', '#_saradc_ch1=427'),# 0.75v
 				('rv1126-c13-v2', '#_saradc_ch1=512')])# 0.9v
 
-DTBS['BBL'] = OrderedDict([('rv1126-c13-v1', '#_saradc_ch1=427'),# 0.75v
+DTBS['BBL'] = OrderedDict([('rv1126-n2-v1', '#_saradc_ch1=0'),# 0v
+				('rv1126-c13-v1', '#_saradc_ch1=427'),# 0.75v
 				('rv1126-c13-v2', '#_saradc_ch1=512'),# 0.9v
 				('rv1126-bl-p001-v5', '#_saradc_ch1=683')])# 1.2v
 
