@@ -1484,16 +1484,16 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
 		return 0;
 
 	// scan dsi-ports-port@<scan>-remote-endpoint
-	for(scan = 1; scan <= max_scan; scan++) {
+	for (scan = 1; scan <= max_scan; scan++) {
 		ret = drm_of_find_panel_or_bridge(dev->of_node, scan, -1,
 				&dsi->panel, &dsi->bridge);
-		if(ret != -ENODEV){
+		if (ret != -ENODEV) {
 			DRM_DEV_INFO(dev, "find panel: %d", scan);
 			break;
 		}
 	}
 
-	if(scan > max_scan) {
+	if(scan > max_scan || ret) {
 		DRM_DEV_ERROR(dev, "Failed to find panel or bridge: %d\n", ret);
 		return ret;
 	}
