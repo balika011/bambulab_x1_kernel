@@ -311,6 +311,7 @@
 				status = "disabled";
 				logo,uboot = "logo.bmp";
 				logo,kernel = "logo_kernel.bmp";
+				logo,fastboot = "logo_fastboot.bmp";
 				logo,mode = "center";
 				charge_logo,mode = "center";
 				connect = <&vop_out_dsi>;
@@ -320,6 +321,7 @@
 				status = "disabled";
 				logo,uboot = "logo.bmp";
 				logo,kernel = "logo_kernel.bmp";
+				logo,fastboot = "logo_fastboot.bmp";
 				logo,mode = "center";
 				charge_logo,mode = "center";
 				connect = <&vop_out_rgb>;

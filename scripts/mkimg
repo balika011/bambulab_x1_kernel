@@ -35,34 +35,6 @@ while [ $# -gt 0 ]; do
         esac
 done
 
-srctree=${srctree-"."}
-objtree=${objtree-"."}
-if [ "${ARCH}" == "" ]; then
-	if [ "$($srctree/scripts/config --state CONFIG_ARM)" == "y" ]; then
-		ARCH=arm
-	else
-		ARCH=arm64
-	fi
-fi
-
-LOGO_PATH=${srctree}/logo.bmp
-[ -f ${LOGO_PATH} ] && LOGO=logo.bmp
-
-LOGO_KERNEL_PATH=${srctree}/logo_kernel.bmp
-[ -f ${LOGO_KERNEL_PATH} ] && LOGO_KERNEL=logo_kernel.bmp
-
-KERNEL_IMAGE_PATH=${objtree}/arch/${ARCH}/boot/Image
-KERNEL_IMAGE_ARG="--kernel ${KERNEL_IMAGE_PATH}"
-if [ "${ARCH}" == "arm" ]; then
-	KERNEL_ZIMAGE_PATH=${objtree}/arch/arm/boot/zImage
-	KERNEL_ZIMAGE_ARG="--kernel ${KERNEL_ZIMAGE_PATH}"
-	ZIMAGE=zImage
-else
-	KERNEL_ZIMAGE_ARG="--kernel ${objtree}/arch/arm64/boot/Image.lz4"
-	ZIMAGE=Image.lz4
-fi
-
-OUT=out
 ITB=${BOOT_IMG}
 ITS=boot.its
 MKIMAGE="./rkbin/tools/mkimage"
@@ -79,22 +51,17 @@ check_mkimage()
 }
 
 if [ -x ${srctree}/scripts/bmpconvert ]; then
-	if [ -f ${LOGO_PATH} ]; then
-		${srctree}/scripts/bmpconvert ${LOGO_PATH};
+	if [ -f boot.bmp ]; then
+		${srctree}/scripts/bmpconvert boot.bmp;
 	fi
-	if [ -f ${LOGO_KERNEL_PATH} ]; then
-		${srctree}/scripts/bmpconvert ${LOGO_KERNEL_PATH};
+	if [ -f logo_kernel.bmp ]; then
+		${srctree}/scripts/bmpconvert logo_kernel.bmp;
+	fi
+	if [ -f logo_fastboot.bmp ]; then
+		${srctree}/scripts/bmpconvert logo_fastboot.bmp;
 	fi
 fi
 
-if [ "${srctree}" != "${objtree}" ]; then
-	if [ -f ${LOGO_PATH} ]; then
-		cp -a ${LOGO_PATH} ${objtree}/;
-	fi
-	if [ -f ${LOGO_KERNEL_PATH} ]; then
-		cp -a ${LOGO_KERNEL_PATH} ${objtree}/;
-	fi
-fi
 
 make ARCH=arm dtbs
 python scripts/mkmultidtb.py ${DTB}
